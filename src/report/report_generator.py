@@ -348,9 +348,9 @@ def _page_conclusion(story, ss):
     story.append(Paragraph(
         "A analise integrada de dados fundamentalistas, sentimento de mercado e modelos de "
         "machine learning identifica ITUB4, EGIE3, CMIG4 e CPFE3 como as melhores oportunidades "
-        "no universo avaliado, com scores acima de 65 e recomendacao Buy. ITUB4 lidera apesar "
-        "de dados incompletos (net_income NaN), sustentado por forte probabilidade de outperformance "
-        "do modelo supervisionado (98.5%) e sentimento extremamente positivo. No setor eletrico, "
+        "no universo avaliado, com scores acima de 65 e recomendacao Buy. ITUB4 lidera com "
+        "score 72.6, sustentado por ROE de 19.0%, net margin de 12.6%, forte probabilidade de "
+        "outperformance (98.5%) e sentimento extremamente positivo. No setor eletrico, "
         "EGIE3 combina qualidade financeira (ROE 35%, cluster Quality) com desconto de P/L vs "
         "setor. SANB11 e EQTL3, com scores abaixo de 45, sao os unicos Sell, penalizados por "
         "momentum negativo e posicao relativa fraca nos multiplos setoriais. "
@@ -371,8 +371,8 @@ def _page_conclusion(story, ss):
          "Integrar CVM Fatos Relevantes"],
         ["Walk-forward com 4 anos", "Overfitting possivel",
          "Expandir janela historica"],
-        ["ITUB4 net_income faltando", "Score parcial",
-         "Verificar CNPJ no DFP"],
+        ["Universo bancario", "account_codes DRE variam por instituicao",
+         "Mapear codigos por setor antes da ingestao"],
     ]
     lt = Table(lim_data, colWidths=[140, 120, 150])
     lt.setStyle(TableStyle([
