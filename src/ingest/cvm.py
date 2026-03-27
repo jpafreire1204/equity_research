@@ -242,30 +242,53 @@ def ingest_income() -> pd.DataFrame:
     raw = pd.concat(all_frames, ignore_index=True)
     raw = raw.dropna(subset=["ticker", "year", "value"])
 
-    # Map account codes to standard names
-    # CVM standard DRE account codes (consolidated):
-    #   3.01   = Receita de Venda de Bens e/ou Serviços (Revenue)
-    #   3.05   = Resultado Antes do Resultado Financeiro e dos Tributos (EBIT)
-    #   3.11   = Lucro/Prejuízo Consolidado do Período (Net Income)
-    # For banks, revenue is usually 3.01 (Receitas da Intermediação Financeira)
-    account_map = {
-        "3.01": "revenue",
-        "3.05": "ebit",
-        "3.11": "net_income",
+    # Map account codes to standard names.
+    # CVM DRE account codes vary by company type:
+    #   Revenue:    3.01 (standard + banks)
+    #   EBIT:       3.05 (standard), 3.08/3.07 (banks)
+    #   Net Income: 3.11 (standard), 3.10/3.09 (banks using different DRE layout)
+    # Fallback priority: try each code in order, keep first non-empty match per ticker/year.
+    INCOME_ACCOUNTS = {
+        "revenue": ["3.01", "3.03"],
+        "net_income": ["3.11", "3.10", "3.09"],
+        "ebit": ["3.05", "3.08", "3.07"],
     }
 
-    filtered = raw[raw["account_code"].isin(account_map.keys())].copy()
-    filtered["metric"] = filtered["account_code"].map(account_map)
+    records = []
+    for (ticker, sector, year), grp in raw.groupby(["ticker", "sector", "year"]):
+        row = {"ticker": ticker, "sector": sector, "year": year}
+        for field, codes in INCOME_ACCOUNTS.items():
+            row[field] = None
+            for code in codes:
+                match = grp[grp["account_code"] == code]
+                if not match.empty:
+                    row[field] = match["value"].iloc[-1]  # last occurrence (end-of-period)
+                    break
+        records.append(row)
 
-    # Pivot to wide format
-    pivoted = filtered.pivot_table(
-        index=["ticker", "sector", "year"],
-        columns="metric",
-        values="value",
-        aggfunc="last",
-    ).reset_index()
+    pivoted = pd.DataFrame(records)
 
-    pivoted.columns.name = None
+    # Fallback: fill missing net_income from DFC (6.01.01.01 = "Lucro Líquido")
+    # in fundamentals_long.parquet (cash flow statement starts with net income).
+    fund_path = PROCESSED_DIR / "fundamentals_long.parquet"
+    if fund_path.exists():
+        fund = pd.read_parquet(fund_path)
+        dfc_ni = fund[fund["account_code"] == "6.01.01.01"].copy()
+        # Take last entry per ticker/year (end-of-period)
+        dfc_ni = (
+            dfc_ni.sort_values("value")
+            .groupby(["ticker", "year"])["value"]
+            .last()
+            .reset_index()
+            .rename(columns={"value": "net_income_dfc"})
+        )
+        pivoted = pivoted.merge(dfc_ni, on=["ticker", "year"], how="left")
+        mask = pivoted["net_income"].isna() & pivoted["net_income_dfc"].notna()
+        if mask.any():
+            filled = pivoted.loc[mask, "ticker"].unique()
+            print(f"[DFC fallback] Filled net_income for: {list(filled)}")
+            pivoted.loc[mask, "net_income"] = pivoted.loc[mask, "net_income_dfc"]
+        pivoted.drop(columns=["net_income_dfc"], inplace=True)
 
     # Ensure all expected columns exist
     for col in ["revenue", "net_income", "ebit"]:
