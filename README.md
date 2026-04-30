@@ -142,3 +142,21 @@ python -m src.report.report_generator
 - Incerteza explicitada via 3 cenarios macro (Bull/Base/Bear)
 - Agente com fallback gracioso (tool failure -> "DATA UNAVAILABLE")
 - Relatorio com disclaimer automatico em todas as paginas
+
+## Deploy
+
+The app is deployed to Streamlit Community Cloud. Access at: <PLACEHOLDER_URL>
+
+### Local Development
+1. Clone the repo
+2. Create venv: `py -3.12 -m venv .venv`
+3. Activate: `.\.venv\Scripts\Activate.ps1` (Windows) or `source .venv/bin/activate` (Unix)
+4. Install: `pip install -r requirements.txt`
+5. Run: `streamlit run app/main.py`
+
+### Cloud Deploy (Streamlit Community Cloud)
+1. Repo: `jpafreire1204/equity_research`
+2. Branch: `feat/thesis-auditor` (or `master` after merge)
+3. Main file path: `app/main.py`
+4. Python version: 3.12 (pinned in `.python-version`)
+5. Advanced settings: no secrets required currently
