@@ -36,7 +36,7 @@ YF_TICKERS = [f"{t}.SA" for t in TICKERS_B3] + [BENCHMARK]
 
 # Date range (Unix timestamps)
 START_DATE = "2020-01-01"
-END_DATE = "2025-12-31"
+END_DATE = datetime.now().date().isoformat()
 
 _HEADERS = {"User-Agent": "Mozilla/5.0"}
 
