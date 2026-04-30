@@ -59,7 +59,7 @@ RISK_KEYWORDS: dict[str, int] = {
     "desinvestimento": -1,
 }
 
-REFERENCE_DATE = pd.Timestamp("2024-12-31")
+REFERENCE_DATE = pd.Timestamp.today().normalize()
 HALF_LIFE_DAYS = 90
 
 
