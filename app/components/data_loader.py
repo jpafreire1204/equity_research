@@ -30,6 +30,11 @@ def load_feature_matrix() -> pd.DataFrame:
 
 
 @st.cache_data(ttl=3600)
+def load_feature_importance() -> pd.DataFrame:
+    return pd.read_parquet(PROCESSED_DIR / "feature_importance.parquet")
+
+
+@st.cache_data(ttl=3600)
 def get_data_freshness() -> str:
     """Return mtime of ultimate_scores_2024.parquet as a friendly string."""
     p = PROCESSED_DIR / "ultimate_scores_2024.parquet"

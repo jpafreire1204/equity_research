@@ -1,0 +1,78 @@
+"""Static methodology content — tables, thresholds, narrative text."""
+import pandas as pd
+
+WALK_FORWARD = pd.DataFrame([
+    {"Fold": 1, "Treino": "2020", "Teste": "2021", "ROC AUC": 0.875},
+    {"Fold": 2, "Treino": "2020-2021", "Teste": "2022", "ROC AUC": 0.524},
+    {"Fold": 3, "Treino": "2020-2022", "Teste": "2023", "ROC AUC": 0.375},
+])
+WALK_FORWARD_MEAN = 0.591
+WALK_FORWARD_STD = 0.257
+
+PROFILE_WEIGHTS = pd.DataFrame([
+    {"Componente": "Valuation", "Conservador": "35%", "Base": "25%", "Agressivo": "20%"},
+    {"Componente": "Fundamentos", "Conservador": "30%", "Base": "35%", "Agressivo": "30%"},
+    {"Componente": "Sentimento Textual", "Conservador": "25%", "Base": "25%", "Agressivo": "15%"},
+    {"Componente": "Prob. Outperform", "Conservador": "10%", "Base": "15%", "Agressivo": "35%"},
+])
+
+TENSION_THRESHOLDS = pd.DataFrame([
+    {
+        "Driver": "Qualidade de fundamentos",
+        "HIGH (bullish)": "ROE -2pp YoY E Margem -1pp YoY",
+        "MEDIUM (bullish)": "Apenas um dos dois caiu",
+        "Nota": "Para tese bearish, regras invertidas (HIGH = ROE +2pp E Margem +1pp).",
+    },
+    {
+        "Driver": "Valuation atrativo",
+        "HIGH (bullish)": "Trading >10% acima da mediana setorial",
+        "MEDIUM (bullish)": "Premium de 0% a 10%",
+        "Nota": "Para tese bearish, HIGH = trading >10% abaixo da mediana setorial.",
+    },
+    {
+        "Driver": "Momentum positivo",
+        "HIGH (bullish)": "Momentum 6m < -10% E 12m < 0%",
+        "MEDIUM (bullish)": "Apenas um dos dois negativo",
+        "Nota": "Para tese bearish, HIGH = 6m > +10% E 12m > 0%.",
+    },
+    {
+        "Driver": "Sentimento de mercado",
+        "HIGH (bullish)": "Índice textual < 30/100",
+        "MEDIUM (bullish)": "Índice 30-50/100",
+        "Nota": "Para tese bearish, HIGH = índice > 70/100.",
+    },
+    {
+        "Driver": "Cenário macro",
+        "HIGH (bullish)": "Bear scenario downside < -5%",
+        "MEDIUM (bullish)": "Base scenario upside < 1%",
+        "Nota": "Para tese bearish, HIGH = Bull scenario upside > +5%.",
+    },
+])
+
+LIMITATIONS = pd.DataFrame([
+    {
+        "Limitação": "Universo n=10",
+        "Impacto": "Baixo poder estatístico nos modelos supervisionados",
+        "Mitigação atual": "Resultados reportados com desvio-padrão; thresholds de tensão usam regras determinísticas, não ML.",
+    },
+    {
+        "Limitação": "Proxy EBITDA (EBIT × 1.15)",
+        "Impacto": "Múltiplos EV/EBITDA são aproximados, não exatos",
+        "Mitigação atual": "Reportado nos cards de evidência; não usado isoladamente para decisão.",
+    },
+    {
+        "Limitação": "Fonte de notícias via Google News RSS",
+        "Impacto": "Cobertura limitada; pode subestimar sinais de empresas menos cobertas",
+        "Mitigação atual": "Sentimento é apenas 25-35% do score final, dependendo do perfil.",
+    },
+    {
+        "Limitação": "Walk-forward com 4 anos (2020-2023)",
+        "Impacto": "Janela curta; modelo pode não generalizar para regimes não vistos",
+        "Mitigação atual": "ROC AUC reportado por fold com transparência; auditor não usa o supervisionado para o veredito principal.",
+    },
+    {
+        "Limitação": "Sentimento via half-life de 90 dias",
+        "Impacto": "Notícias antigas pesam menos; choques recentes podem dominar",
+        "Mitigação atual": "REFERENCE_DATE atualizado a cada execução do pipeline (hoje: data atual).",
+    },
+])

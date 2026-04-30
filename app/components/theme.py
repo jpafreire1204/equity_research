@@ -142,6 +142,47 @@ h1, h2, h3, h4 {
 [data-baseweb="select"] [aria-selected="true"] {
     background-color: rgba(92, 26, 42, 0.08) !important;
 }
+
+.brand-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    font-size: 0.92rem;
+    margin-top: 1rem;
+}
+
+.brand-table thead {
+    background-color: rgba(92, 26, 42, 0.06);
+}
+
+.brand-table th {
+    text-align: left;
+    padding: 0.85rem 1rem;
+    font-weight: 600;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6B6B6B;
+    border-bottom: 1px solid rgba(92, 26, 42, 0.1);
+}
+
+.brand-table td {
+    padding: 0.85rem 1rem;
+    vertical-align: top;
+    color: #1C1C1C;
+    border-bottom: 1px solid rgba(0,0,0,0.04);
+    line-height: 1.45;
+}
+
+.brand-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.brand-table td.col-emphasis {
+    font-weight: 500;
+}
 </style>
 """
 
