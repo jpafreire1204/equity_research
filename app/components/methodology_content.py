@@ -75,4 +75,9 @@ LIMITATIONS = pd.DataFrame([
         "Impacto": "Notícias antigas pesam menos; choques recentes podem dominar",
         "Mitigação atual": "REFERENCE_DATE atualizado a cada execução do pipeline (hoje: data atual).",
     },
+    {
+        "Limitação": "Convicção declarada é auto-reportada",
+        "Impacto": "Usuário pode inflar convicção para forçar o veredito desejado",
+        "Mitigação atual": "Gap de Convicção é exposto separadamente do score; amplificação de severidade torna a auto-inflação custosa quando dados contradizem o driver.",
+    },
 ])

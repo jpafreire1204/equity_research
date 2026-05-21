@@ -39,80 +39,100 @@ def _data_freshness() -> str:
         return "n/d"
 
 
+def _gap_caption(gap: float) -> str:
+    if gap == 0:
+        return "Sem dissonância entre convicção e dados"
+    if gap < 30:
+        return "Dissonância leve"
+    if gap < 70:
+        return "Dissonância material"
+    return "Alta dissonância — revisar tese"
+
+
 def _render_form() -> ThesisInput | None:
-    with st.form("audit_form", clear_on_submit=False):
-        col_l, col_r = st.columns([1, 1])
-        with col_l:
-            ticker = st.selectbox(
-                "Ticker", ALL_TICKERS, index=0,
-                help="Empresa do universo de cobertura.",
-            )
-        with col_r:
-            direction_label = st.radio(
-                "Direção da tese",
-                ["Bullish (espero alta)", "Bearish (espero queda)"],
-                horizontal=True,
-            )
-        direction = "bullish" if direction_label.startswith("Bullish") else "bearish"
-
-        driver_labels = st.multiselect(
-            "Quais drivers sustentam sua tese? Selecione 1-5",
-            options=[label for _, label in DRIVER_OPTIONS],
-            default=[DRIVER_OPTIONS[0][1], DRIVER_OPTIONS[2][1]],
+    col_l, col_r = st.columns([1, 1])
+    with col_l:
+        ticker = st.selectbox(
+            "Ticker", ALL_TICKERS, index=0,
+            help="Empresa do universo de cobertura.",
         )
-
-        rationale = st.text_area(
-            "Sua tese em texto livre",
-            placeholder=(
-                "Ex: Itaú deve continuar performando bem nos próximos trimestres "
-                "porque ROE permanece elevado e momentum recente confirma a tendência."
-            ),
-            max_chars=500,
-            height=120,
+    with col_r:
+        direction_label = st.radio(
+            "Direção da tese",
+            ["Bullish (espero alta)", "Bearish (espero queda)"],
+            horizontal=True,
         )
-        st.caption(f"{len(rationale)}/500 caracteres · mínimo 30")
+    direction = "bullish" if direction_label.startswith("Bullish") else "bearish"
 
-        submitted = st.form_submit_button("Auditar Tese")
+    driver_labels = st.multiselect(
+        "Quais drivers sustentam sua tese? Selecione 1-5",
+        options=[label for _, label in DRIVER_OPTIONS],
+        default=[DRIVER_OPTIONS[0][1], DRIVER_OPTIONS[2][1]],
+        max_selections=5,
+    )
+    selected_drivers = [_LABEL_TO_KEY[label] for label in driver_labels]
+
+    for k in list(st.session_state.keys()):
+        if k.startswith("conv_") and k[5:] not in selected_drivers:
+            del st.session_state[k]
+
+    convictions: dict[str, int] = {}
+    if selected_drivers:
+        st.markdown("**Convicção por driver** (1 = especulativo, 10 = altíssima)")
+        cols = st.columns(min(len(selected_drivers), 3))
+        for i, d in enumerate(selected_drivers):
+            with cols[i % len(cols)]:
+                convictions[d] = st.slider(
+                    DRIVER_LABELS.get(d, d),
+                    min_value=1, max_value=10, value=7, step=1,
+                    key=f"conv_{d}",
+                    help="Quanto você acredita neste driver, independente dos dados.",
+                )
+    else:
+        st.caption("Selecione ao menos 1 driver acima para definir convicções.")
+
+    submitted = st.button("Auditar Tese", type="primary")
 
     if not submitted:
         return None
 
-    if not driver_labels:
+    if not selected_drivers:
         st.error("Selecione ao menos 1 driver.")
         return None
-    if len(rationale.strip()) < 30:
-        st.error("A tese precisa ter ao menos 30 caracteres.")
+    if not all(d in convictions for d in selected_drivers):
+        st.error("Defina convicção para todos os drivers selecionados.")
         return None
 
-    drivers = [_LABEL_TO_KEY[label] for label in driver_labels]
     return ThesisInput(
         ticker=ticker,
-        rationale=rationale.strip(),
         direction=direction,
-        drivers=drivers,
+        drivers=selected_drivers,
+        convictions=convictions,
     )
 
 
-def _metric_block(value: str, label: str) -> str:
+def _metric_block(value: str, label: str, caption: str | None = None) -> str:
+    caption_html = (
+        f'<div class="metric-caption">{html.escape(caption)}</div>'
+        if caption
+        else ""
+    )
     return (
         f'<div class="metric-block">'
         f'<div class="metric-value">{html.escape(value)}</div>'
         f'<div class="metric-label">{html.escape(label)}</div>'
+        f'{caption_html}'
         f'</div>'
     )
 
 
 def _render_metrics(result: AuditResult) -> None:
     cols = st.columns(4)
-    numeric_blocks = [
-        (0, f"{result.consistency_score:.1f}", "Score de Consistência"),
-        (2, f"{result.semantic_similarity * 100:.1f}", "Similaridade Semântica"),
-        (3, str(len(result.tensions)), "Nº de Tensões"),
-    ]
-    for idx, value, label in numeric_blocks:
-        with cols[idx]:
-            st.markdown(_metric_block(value, label), unsafe_allow_html=True)
-
+    with cols[0]:
+        st.markdown(
+            _metric_block(f"{result.consistency_score:.1f}", "Score de Consistência"),
+            unsafe_allow_html=True,
+        )
     verdict_label = VERDICT_LABELS[result.verdict]
     verdict_class = VERDICT_CSS_CLASS[result.verdict]
     with cols[1]:
@@ -121,6 +141,20 @@ def _render_metrics(result: AuditResult) -> None:
             f'<div class="verdict-metric-value">{html.escape(verdict_label)}</div>'
             f'<div class="metric-label">Veredito</div>'
             f'</div>',
+            unsafe_allow_html=True,
+        )
+    with cols[2]:
+        st.markdown(
+            _metric_block(
+                f"{result.conviction_gap_score:.0f}",
+                "Gap de Convicção",
+                caption=_gap_caption(result.conviction_gap_score),
+            ),
+            unsafe_allow_html=True,
+        )
+    with cols[3]:
+        st.markdown(
+            _metric_block(str(len(result.tensions)), "Nº de Tensões"),
             unsafe_allow_html=True,
         )
 
@@ -175,7 +209,7 @@ def _render_supporting(result: AuditResult) -> None:
 def _render_metadata(result: AuditResult) -> None:
     st.caption(
         f"Auditado em {result.auditado_em} · "
-        f"Modelo: paraphrase-multilingual-MiniLM-L12-v2 · "
+        f"Pipeline determinístico (regras + amplificação por convicção) · "
         f"Dados: {_data_freshness()}"
     )
 

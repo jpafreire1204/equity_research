@@ -43,15 +43,17 @@ def _render_pipeline_overview() -> None:
         "sentimento, valuation, score composto) consultam parquets pré-processados. "
         "Sem chamadas externas em runtime.\n"
         "2. **Detecção de tensões:** regras determinísticas comparam a direção da "
-        "tese (bullish/bearish) com slopes e thresholds dos dados. Sem ML "
-        "supervisionado nessa etapa.\n"
-        "3. **Similaridade semântica:** embeddings multilingual "
-        "(paraphrase-multilingual-MiniLM-L12-v2, 118M params) calculam cosseno "
-        "entre o texto da tese e a narrativa data-driven do ticker.\n"
+        "tese (bullish/bearish) com slopes e thresholds dos dados, por driver "
+        "declarado. Sem ML supervisionado nesta etapa.\n"
+        "3. **Amplificação por convicção:** a severidade de cada tensão é "
+        "ajustada pela convicção declarada (1-10) no driver correspondente. "
+        "Convicção 9-10 sobe a severidade um nível; 1-3 reduz um nível. "
+        "Convicções intermediárias (4-8) mantêm a severidade neutra.\n"
         "4. **Score de consistência:** começa em 100, subtrai por tensão "
-        "(HIGH -25, MEDIUM -10, LOW -5), multiplica pela similaridade semântica "
-        "(0.5 + 0.5 × cosseno). Veredito: ≥70 sustentável, 40-69 com ressalvas, "
-        "<40 fragilizada."
+        "(HIGH -25, MEDIUM -10, LOW -5). Veredito: ≥70 sustentável, 40-69 com "
+        "ressalvas, <40 fragilizada. Em paralelo, Gap de Convicção (0-100) "
+        "mede o quanto a convicção declarada nos drivers contradiz a evidência "
+        "coletada."
     )
 
 
@@ -126,10 +128,11 @@ def _render_feature_importance() -> None:
     fig.update_xaxes(range=[0, df["importance"].max() * 1.15], title_text="")
     fig.update_yaxes(title_text="")
     fig.update_layout(legend_title_text="", showlegend=False)
-    fig.for_each_annotation(
-        lambda a: a.update(text="") if a.text == "undefined" else None
+    apply_brand_layout(
+        fig,
+        title="Importância de Features no Modelo Supervisionado",
+        height=400,
     )
-    apply_brand_layout(fig, height=400)
     st.plotly_chart(fig, use_container_width=True)
 
 
@@ -184,9 +187,9 @@ def _render_reproducibility() -> None:
         "- Pipeline completo: `python -m src.ingest.market` → "
         "`python -m src.ingest.cvm` → `python -m src.ingest.macro` → ... → "
         "`python -m src.valuation.valuation_score`\n"
-        "- Auditor CLI: `python -m src.auditor.cli --ticker ITUB4 "
+        "- Auditor CLI: `python -m src.auditor --ticker ITUB4 "
         "--direction bullish --drivers fundamentals_quality momentum_positive "
-        "--rationale '<sua tese>'`"
+        "--convictions fundamentals_quality=9 momentum_positive=7`"
     )
 
 
@@ -218,5 +221,5 @@ def render() -> None:
     st.markdown("")
     st.caption(
         f"Dados atualizados em {get_data_freshness()}. "
-        "Modelo de embeddings: paraphrase-multilingual-MiniLM-L12-v2."
+        "Inferência 100% determinística — sem embeddings, sem LLM em runtime."
     )

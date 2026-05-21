@@ -97,6 +97,14 @@ h1, h2, h3, h4 {
     letter-spacing: 0.05em;
 }
 
+.metric-caption {
+    font-size: 0.78rem;
+    color: #6B6B6B;
+    margin-top: 0.5rem;
+    line-height: 1.3;
+    font-style: italic;
+}
+
 .tension-item {
     background: white;
     border-radius: 6px;
