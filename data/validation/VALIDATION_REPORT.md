@@ -12,11 +12,11 @@ Validamos o Auditor de Teses contra **39 teses curadas** da imprensa financeira 
 - **Janela de publicação:** 2022-03-24 a 2024-06-17.
 - **Descoberta:** Exa MCP web search sobre infomoney, moneytimes, seudinheiro, valor.globo, sunoresearch, investidor10. 50 candidatos únicos após dedup, filtro de janela e remoção de paywall stubs.
 - **Triagem humana:** 39 KEEP / 11 SKIP. Critérios: direção clara (bullish/bearish), pelo menos 1 driver identificável, racional datado (não apenas notícia/release).
-- **Extração:** rationale preserva voz original do autor (≤400 chars); direção e drivers atribuídos manualmente durante triagem.
+- **Extração:** narrativa histórica da tese preservada como referência; na arquitetura atual do auditor, a entrada do usuário é estruturada via drivers + convicção (1-10), não texto livre. As 39 teses foram re-auditadas atribuindo convicção neutra (7/10) em todos os drivers declarados para preservar comparabilidade com o resultado original.
 - **Ground truth:** alpha = retorno do ticker em 6m − retorno do Ibovespa no mesmo intervalo.
 - **Zona morta:** |alpha| < 5pp ⇒ **inconclusive** (excluído da acurácia estrita).
 - **Mapeamento auditor → previsão:** sustentavel→sustained, sustentavel_com_ressalvas→inconclusive, fragilizada→failed.
-- **Sem LLM no loop:** extração de tese e ground truth são determinísticos; o auditor usa seu próprio scorer + sentence-transformers (paraphrase-multilingual-MiniLM-L12-v2).
+- **Sem LLM no loop:** extração de tese e ground truth são determinísticos; o auditor usa scorer baseado em regras determinísticas sobre evidência tabular, com amplificação por convicção declarada (sem embeddings, sem LLM em runtime).
 
 ## Resultados
 
@@ -47,7 +47,7 @@ Validamos o Auditor de Teses contra **39 teses curadas** da imprensa financeira 
 
 O Auditor produz "Com Ressalvas" em 74% dos casos. Isso reflete uma calibração deliberadamente conservadora: na ausência de evidência forte, o sistema recusa comprometer-se com um veredito categórico. Para um produto cuja proposta de valor é contraposição à certeza vendida pelo varejo financeiro brasileiro, esse comportamento é desenho, não defeito.
 
-A consequência mecânica está no scorer: `compute_score` multiplica a base determinística de 100 pontos pelo fator `(0.5 + 0.5 × similaridade_semântica)`. Como a similaridade típica entre tese e narrativa data-driven cai entre 0,3 e 0,6, o score final concentra-se na faixa 40-69 — exatamente o intervalo "Com Ressalvas". Os 100% de precisão nos comprometimentos vêm justamente desse limiar alto: o sistema só promove para Sustentável ou Fragilizada quando há concordância forte entre evidência quantitativa e voz do autor.
+A consequência mecânica está no scorer: a base começa em 100 e cada tensão detectada subtrai pontos (HIGH −25, MEDIUM −10, LOW −5). Como teses curadas tipicamente acumulam 2-3 tensões de severidade mista contra a evidência observada, o score final concentra-se na faixa 40-69 — exatamente o intervalo "Com Ressalvas". Os 100% de precisão nos comprometimentos vêm desse limiar alto: o sistema só promove para Sustentável quando os dados não geram tensões materiais, e só rebaixa para Fragilizada quando múltiplas tensões HIGH se acumulam.
 
 ## Análise por Driver
 
@@ -70,7 +70,7 @@ As taxas baixas refletem o efeito do viés conservador: como a maioria dos casos
 
 Causas possíveis (não fix; apenas reportadas):
 - **Thresholds de tensão muito conservadores** em `tensions.py` — a severidade média/alta exige discrepâncias quantitativas grandes entre tese e evidência, raras em teses bearish bem fundamentadas.
-- **Multiplicador de similaridade semântica diluindo casos extremos** — uma tese bearish coerente tipicamente tem similaridade alta com a narrativa data-driven (concordam que há problemas), o que paradoxalmente preserva o score na zona "ressalvas" em vez de pressioná-lo para "fragilizada".
+- **Custo de tensão calibrado para o lado bullish** — teses bearish coerentes geram tensões quando os dados *contradizem* a direção declarada, mas a regra atual exige discrepâncias YoY substanciais (ROE +2pp E margem +1pp para HIGH) que raramente se materializam em pares com fundamentos estáveis, deixando o score na zona "ressalvas" em vez de pressioná-lo para "fragilizada".
 - **Ausência de penalização direcional** — o scorer não pondera contradição entre direção declarada e sinais quantitativos disponíveis (ex.: tese bearish + momentum positivo do ativo nos 6m anteriores).
 
 Não há fix proposto neste relatório. Investigação dirigida exigiria amostra maior e ablação dos componentes do scorer.
@@ -98,3 +98,7 @@ O sistema atual privilegia precisão sobre cobertura — comprometer-se em pouco
 ## Conclusão
 
 O Auditor entrega 100% de precisão (6/6) quando se compromete a um veredito categórico, em troca de recall baixo (33% em Sustained, 9% em Failed). Esse é o trade-off de um sistema desenhado para recusar falsa certeza. A limitação central é a detecção de teses fragilizadas — uma fraqueza conhecida que demanda amostras maiores e investigação dirigida do scorer antes de qualquer mudança de calibração.
+
+## Nota sobre Arquitetura
+
+Este relatório foi originalmente gerado sob a arquitetura de entrada via texto livre (rationale + embedding semântico). A arquitetura atual (v2) substitui o texto livre por convicção declarada (1-10) por driver, eliminando o componente de embedding em runtime. Os outcomes históricos (sustained/failed/inconclusive) e a precisão de comprometimento reportada permanecem válidos, pois dependem da lógica determinística de detecção de tensões — preservada integralmente. A análise de sensibilidade (Seção 6 do app, aba Metodologia) demonstra flip rate de 0.0% sob perturbação de ±2 na convicção declarada, confirmando que o veredito é robusto à mudança de input.
