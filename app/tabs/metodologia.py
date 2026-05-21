@@ -14,6 +14,12 @@ from app.components.html_table import render_brand_table
 from app.components.methodology_content import (
     LIMITATIONS,
     PROFILE_WEIGHTS,
+    SENSITIVITY_BY_DRIVER,
+    SENSITIVITY_FLIP_RATE,
+    SENSITIVITY_MEAN_GAP_DELTA,
+    SENSITIVITY_MEAN_SCORE_DELTA,
+    SENSITIVITY_NARRATIVE,
+    SENSITIVITY_TOTAL_PERTURBATIONS,
     TENSION_THRESHOLDS,
     WALK_FORWARD,
     WALK_FORWARD_GINI_MEAN,
@@ -221,6 +227,63 @@ def _render_tension_thresholds() -> None:
         )
 
 
+def _render_sensitivity() -> None:
+    st.subheader("Análise de Sensibilidade")
+    st.markdown(SENSITIVITY_NARRATIVE)
+
+    cols = st.columns(3)
+    with cols[0]:
+        st.markdown(
+            _metric_block_with_caption(
+                f"{SENSITIVITY_FLIP_RATE:.1%}",
+                "Taxa de Flip de Veredito",
+                f"{SENSITIVITY_TOTAL_PERTURBATIONS} perturbações",
+            ),
+            unsafe_allow_html=True,
+        )
+    with cols[1]:
+        st.markdown(
+            _metric_block_with_caption(
+                f"{SENSITIVITY_MEAN_SCORE_DELTA:.2f} pts",
+                "|Δ Score| Médio",
+                "Impacto da convicção no score",
+            ),
+            unsafe_allow_html=True,
+        )
+    with cols[2]:
+        st.markdown(
+            _metric_block_with_caption(
+                f"{SENSITIVITY_MEAN_GAP_DELTA:.2f} pts",
+                "|Δ Gap| Médio",
+                "Impacto da convicção no gap",
+            ),
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("**Sensibilidade por driver**")
+    st.dataframe(
+        SENSITIVITY_BY_DRIVER,
+        column_config={
+            "Flip rate": st.column_config.NumberColumn("Flip rate", format="%.1%"),
+            "|Δ Score| médio": st.column_config.NumberColumn(
+                "|Δ Score| médio", format="%.2f"
+            ),
+            "|Δ Gap| médio": st.column_config.NumberColumn(
+                "|Δ Gap| médio", format="%.2f"
+            ),
+            "N": st.column_config.NumberColumn("N", format="%d", width="small"),
+        },
+        hide_index=True,
+        use_container_width=True,
+    )
+    st.caption(
+        "Drivers com flip rate alto teriam maior peso causal no veredito. "
+        "Com flip rate de 0% em todas as categorias, a convicção declarada "
+        "modula o Gap mas não consegue forçar o veredito quando contradiz a "
+        "evidência — propriedade desejada para resistir a auto-inflação."
+    )
+
+
 def _render_limitations() -> None:
     st.subheader("Limitações")
     st.markdown(
@@ -270,6 +333,8 @@ def render() -> None:
     st.markdown("")
     _render_profile_weights()
     _render_tension_thresholds()
+    st.markdown("")
+    _render_sensitivity()
     st.markdown("")
     _render_limitations()
     st.markdown("")

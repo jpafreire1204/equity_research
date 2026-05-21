@@ -56,6 +56,32 @@ TENSION_THRESHOLDS = pd.DataFrame([
     },
 ])
 
+SENSITIVITY_TOTAL_PERTURBATIONS = 132
+SENSITIVITY_FLIP_RATE = 0.000
+SENSITIVITY_MEAN_SCORE_DELTA = 0.91
+SENSITIVITY_MEAN_GAP_DELTA = 14.55
+
+SENSITIVITY_BY_DRIVER = pd.DataFrame([
+    {"Driver": "fundamentals_quality", "Δ Convicção": "±2", "Flip rate": 0.000,
+     "|Δ Score| médio": 1.591, "|Δ Gap| médio": 19.394, "N": 66},
+    {"Driver": "valuation_attractive", "Δ Convicção": "±2", "Flip rate": 0.000,
+     "|Δ Score| médio": 0.000, "|Δ Gap| médio": 8.000, "N": 40},
+    {"Driver": "sentiment_supportive", "Δ Convicção": "±2", "Flip rate": 0.000,
+     "|Δ Score| médio": 0.938, "|Δ Gap| médio": 12.500, "N": 16},
+    {"Driver": "macro_tailwind", "Δ Convicção": "±2", "Flip rate": 0.000,
+     "|Δ Score| médio": 0.000, "|Δ Gap| médio": 12.000, "N": 10},
+])
+
+SENSITIVITY_NARRATIVE = (
+    "Cada uma das 39 teses históricas curadas foi reauditada variando a "
+    "convicção declarada em ±2 pontos para cada driver, mantendo os demais "
+    "constantes em 7/10 (baseline neutro-positivo). A taxa de flip de "
+    "veredito é zero — confirmando que o veredito é dominado pelas regras "
+    "determinísticas sobre evidência, e a convicção declarada modula "
+    "principalmente o Gap de Convicção, não o resultado final."
+)
+
+
 LIMITATIONS = pd.DataFrame([
     {
         "Limitação": "Universo n=10",
