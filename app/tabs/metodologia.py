@@ -16,6 +16,10 @@ from app.components.methodology_content import (
     PROFILE_WEIGHTS,
     TENSION_THRESHOLDS,
     WALK_FORWARD,
+    WALK_FORWARD_GINI_MEAN,
+    WALK_FORWARD_GINI_STD,
+    WALK_FORWARD_KS_MEAN,
+    WALK_FORWARD_KS_STD,
     WALK_FORWARD_MEAN,
     WALK_FORWARD_STD,
 )
@@ -57,44 +61,96 @@ def _render_pipeline_overview() -> None:
     )
 
 
+def _supervised_verdict(gini_mean: float) -> str:
+    if gini_mean < 0.20:
+        return "Sinal fraco"
+    if gini_mean < 0.40:
+        return "Sinal moderado"
+    return "Sinal forte"
+
+
+def _metric_block_with_caption(value: str, label: str, caption: str) -> str:
+    return (
+        f'<div class="metric-block" style="margin-bottom:0.6rem;">'
+        f'<div class="metric-value" style="font-size:1.8rem;">{html.escape(value)}</div>'
+        f'<div class="metric-label">{html.escape(label)}</div>'
+        f'<div class="metric-caption">{html.escape(caption)}</div>'
+        f'</div>'
+    )
+
+
 def _render_supervised_performance() -> None:
     st.subheader("Performance do Modelo Supervisionado")
     st.markdown(
         "O auditor não depende deste modelo para o veredito principal. Ele é "
         "exposto aqui por completude — usuários técnicos avaliam por si próprios "
         "a qualidade da etapa de probabilidade de outperformance, que entra no "
-        "score composto com peso de 10-35% dependendo do perfil de investidor."
+        "score composto com peso de 10-35% dependendo do perfil de investidor. "
+        "Modelo documentado: GradientBoosting."
     )
-    col_l, col_r = st.columns([2, 1])
-    with col_l:
-        st.dataframe(
-            WALK_FORWARD,
-            column_config={
-                "Fold": st.column_config.NumberColumn("Fold", format="%d", width="small"),
-                "ROC AUC": st.column_config.NumberColumn("ROC AUC", format="%.3f"),
-            },
-            hide_index=True,
-            use_container_width=True,
-        )
-    with col_r:
+    st.dataframe(
+        WALK_FORWARD,
+        column_config={
+            "Fold": st.column_config.NumberColumn("Fold", format="%d", width="small"),
+            "ROC AUC": st.column_config.NumberColumn("ROC AUC", format="%.3f"),
+            "KS": st.column_config.NumberColumn("KS", format="%.3f"),
+            "Gini": st.column_config.NumberColumn("Gini", format="%.3f"),
+        },
+        hide_index=True,
+        use_container_width=True,
+    )
+
+    cols = st.columns(4)
+    with cols[0]:
         st.markdown(
-            _metric_block(f"{WALK_FORWARD_MEAN:.3f}", "ROC AUC Médio"),
+            _metric_block_with_caption(
+                f"{WALK_FORWARD_MEAN:.3f}",
+                "ROC AUC Médio",
+                f"± {WALK_FORWARD_STD:.3f}",
+            ),
             unsafe_allow_html=True,
         )
+    with cols[1]:
         st.markdown(
-            _metric_block(f"{WALK_FORWARD_STD:.3f}", "Desvio-padrão"),
+            _metric_block_with_caption(
+                f"{WALK_FORWARD_KS_MEAN:.3f}",
+                "KS Médio",
+                f"± {WALK_FORWARD_KS_STD:.3f}",
+            ),
             unsafe_allow_html=True,
         )
+    with cols[2]:
         st.markdown(
-            _metric_block("Sinal fraco", "Veredito interno"),
+            _metric_block_with_caption(
+                f"{WALK_FORWARD_GINI_MEAN:.3f}",
+                "Gini Médio",
+                f"± {WALK_FORWARD_GINI_STD:.3f}",
+            ),
+            unsafe_allow_html=True,
+        )
+    with cols[3]:
+        st.markdown(
+            _metric_block(
+                _supervised_verdict(WALK_FORWARD_GINI_MEAN),
+                "Veredito interno",
+            ),
             unsafe_allow_html=True,
         )
 
+    st.markdown(
+        "- **ROC AUC:** probabilidade do modelo ordenar corretamente um par "
+        "outperform/underperform sorteado ao acaso.\n"
+        "- **KS:** separação máxima entre a distribuição de scores das classes "
+        "(prática padrão em credit scoring).\n"
+        "- **Gini:** derivado linear do AUC (2×AUC − 1); convenção do mercado "
+        "financeiro para risco de crédito."
+    )
+
     st.warning(
-        "O fold 3 (treino 2020-2022, teste 2023) caiu para ROC AUC 0.375 — "
-        "pior que aleatório. Esse comportamento, esperado em janelas curtas com "
-        "mudança de regime macro, é a razão pela qual o auditor delega a "
-        "decisão final a regras determinísticas, não ao modelo."
+        "O fold 3 (treino 2020-2022, teste 2023) caiu para ROC AUC 0.417 com "
+        "Gini negativo — pior que aleatório. Esse comportamento, esperado em "
+        "janelas curtas com mudança de regime macro, é a razão pela qual o "
+        "auditor delega a decisão final a regras determinísticas, não ao modelo."
     )
 
 

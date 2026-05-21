@@ -2,12 +2,19 @@
 import pandas as pd
 
 WALK_FORWARD = pd.DataFrame([
-    {"Fold": 1, "Treino": "2020", "Teste": "2021", "ROC AUC": 0.875},
-    {"Fold": 2, "Treino": "2020-2021", "Teste": "2022", "ROC AUC": 0.524},
-    {"Fold": 3, "Treino": "2020-2022", "Teste": "2023", "ROC AUC": 0.375},
+    {"Fold": 1, "Treino": "2020", "Teste": "2021",
+     "ROC AUC": 0.844, "KS": 0.750, "Gini": 0.688},
+    {"Fold": 2, "Treino": "2020-2021", "Teste": "2022",
+     "ROC AUC": 0.500, "KS": 0.190, "Gini": 0.000},
+    {"Fold": 3, "Treino": "2020-2022", "Teste": "2023",
+     "ROC AUC": 0.417, "KS": 0.167, "Gini": -0.167},
 ])
-WALK_FORWARD_MEAN = 0.591
-WALK_FORWARD_STD = 0.257
+WALK_FORWARD_MEAN = 0.587
+WALK_FORWARD_STD = 0.226
+WALK_FORWARD_KS_MEAN = 0.369
+WALK_FORWARD_KS_STD = 0.330
+WALK_FORWARD_GINI_MEAN = 0.174
+WALK_FORWARD_GINI_STD = 0.453
 
 PROFILE_WEIGHTS = pd.DataFrame([
     {"Componente": "Valuation", "Conservador": "35%", "Base": "25%", "Agressivo": "20%"},

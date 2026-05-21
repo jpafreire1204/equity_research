@@ -8,6 +8,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from scipy.stats import ks_2samp
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
@@ -45,27 +46,49 @@ def _safe_roc_auc(y_true, y_prob):
     return roc_auc_score(y_true, y_prob)
 
 
+def _safe_gini(y_true, y_score):
+    """Gini = 2*AUC - 1. Returns NaN when AUC undefined."""
+    auc = _safe_roc_auc(y_true, y_score)
+    if auc != auc:
+        return float("nan")
+    return 2 * auc - 1
+
+
+def _safe_ks(y_true, y_score):
+    """KS statistic: max distance between CDF of positive vs negative class scores.
+    Returns NaN if only one class present in y_true."""
+    y_true = np.asarray(y_true)
+    y_score = np.asarray(y_score)
+    pos = y_score[y_true == 1]
+    neg = y_score[y_true == 0]
+    if len(pos) == 0 or len(neg) == 0:
+        return float("nan")
+    return float(ks_2samp(pos, neg).statistic)
+
+
 # ---------------------------------------------------------------------------
 # Walk-forward validation
 # ---------------------------------------------------------------------------
 
 def walk_forward_validation(
+    model,
     feature_matrix_path: Path | None = None,
-) -> tuple[pd.DataFrame, dict]:
+) -> list[dict]:
     """
-    Walk-forward cross-validation. Returns (metrics_df, fitted_models_last_fold).
+    Walk-forward cross-validation for a single model. Returns one dict per fold.
+
+    The model argument is a sklearn estimator (one of the templates in MODELS).
+    Each fold re-instantiates the estimator from get_params() to avoid leakage.
     """
     feature_matrix_path = feature_matrix_path or DATA_DIR / "feature_matrix.parquet"
     df = pd.read_parquet(feature_matrix_path)
 
-    # Only use 2020-2023 for walk-forward (2024 is inference-only)
     df = df[df["year"] <= 2023].dropna(subset=["label_outperform"]).copy()
     df["label_outperform"] = df["label_outperform"].astype(int)
 
-    years = sorted(df["year"].unique())  # [2020, 2021, 2022, 2023]
-    print(f"Walk-forward years available: {years}")
+    years = sorted(df["year"].unique())
 
-    all_metrics = []
+    records: list[dict] = []
 
     for i in range(1, len(years)):
         train_years = years[:i]
@@ -88,34 +111,41 @@ def walk_forward_validation(
         X_train = scaler.fit_transform(X_train)
         X_test = scaler.transform(X_test)
 
-        for name, model in MODELS.items():
-            model_clone = model.__class__(**model.get_params())
-            model_clone.fit(X_train, y_train)
-            y_pred = model_clone.predict(X_test)
-            y_prob = model_clone.predict_proba(X_test)[:, 1]
+        model_clone = model.__class__(**model.get_params())
+        model_clone.fit(X_train, y_train)
+        y_pred = model_clone.predict(X_test)
+        y_prob = model_clone.predict_proba(X_test)[:, 1]
 
-            metrics = {
-                "fold": i,
-                "train_years": str(train_years),
-                "test_year": test_year,
-                "model": name,
-                "n_train": len(train),
-                "n_test": len(test),
-                "accuracy": round(accuracy_score(y_test, y_pred), 3),
-                "precision": round(precision_score(y_test, y_pred, zero_division=0), 3),
-                "recall": round(recall_score(y_test, y_pred, zero_division=0), 3),
-                "f1": round(f1_score(y_test, y_pred, zero_division=0), 3),
-                "roc_auc": round(_safe_roc_auc(y_test, y_prob), 3),
-            }
-            all_metrics.append(metrics)
+        records.append({
+            "fold": i,
+            "train_years": str(train_years),
+            "test_year": int(test_year),
+            "n_train": len(train),
+            "n_test": len(test),
+            "accuracy": round(accuracy_score(y_test, y_pred), 3),
+            "precision": round(precision_score(y_test, y_pred, zero_division=0), 3),
+            "recall": round(recall_score(y_test, y_pred, zero_division=0), 3),
+            "f1": round(f1_score(y_test, y_pred, zero_division=0), 3),
+            "roc_auc": round(_safe_roc_auc(y_test, y_prob), 3),
+            "ks": round(_safe_ks(y_test, y_prob), 3),
+            "gini": round(_safe_gini(y_test, y_prob), 3),
+        })
 
-    metrics_df = pd.DataFrame(all_metrics)
-    return metrics_df
+    return records
+
+
+def _records_to_df(records_by_model: dict[str, list[dict]]) -> pd.DataFrame:
+    """Flatten {model_name: [fold_dict, ...]} into a tidy DataFrame."""
+    rows = []
+    for name, folds in records_by_model.items():
+        for r in folds:
+            rows.append({"model": name, **r})
+    return pd.DataFrame(rows)
 
 
 def aggregate_metrics(metrics_df: pd.DataFrame) -> pd.DataFrame:
     """Mean ± std of metrics per model across folds."""
-    metric_cols = ["accuracy", "precision", "recall", "f1", "roc_auc"]
+    metric_cols = ["accuracy", "precision", "recall", "f1", "roc_auc", "ks", "gini"]
     rows = []
     for model_name, grp in metrics_df.groupby("model"):
         row = {"model": model_name}
@@ -159,7 +189,6 @@ def extract_feature_importance(
     if hasattr(model, "feature_importances_"):
         importances = model.feature_importances_
     else:
-        # LogisticRegression: use absolute coefficients as importance proxy
         importances = np.abs(model.coef_[0])
     fi = pd.DataFrame({
         "feature": FEATURE_COLS,
@@ -178,20 +207,20 @@ def extract_feature_importance(
 # ---------------------------------------------------------------------------
 
 def predict_2024(
+    model_name: str = "GradientBoosting",
     feature_matrix_path: Path | None = None,
     output_path: Path | None = None,
 ) -> pd.DataFrame:
-    """Train best model on all labeled data, predict 2024."""
+    """Train named model on all labeled data, predict 2024."""
+    print(f"[supervised] predict_2024 using model: {model_name}")
     feature_matrix_path = feature_matrix_path or DATA_DIR / "feature_matrix.parquet"
     output_path = output_path or DATA_DIR / "supervised_predictions_2024.parquet"
 
     df = pd.read_parquet(feature_matrix_path)
 
-    # Training set: 2020-2023 only (no 2024 leakage)
     train = df[df["year"] <= 2023].dropna(subset=["label_outperform"]).copy()
     train["label_outperform"] = train["label_outperform"].astype(int)
 
-    # Inference set: 2024
     predict_df = df[df["year"] == 2024].copy()
 
     X_train = train[FEATURE_COLS].fillna(0).values
@@ -202,10 +231,8 @@ def predict_2024(
     X_train = scaler.fit_transform(X_train)
     X_pred = scaler.transform(X_pred)
 
-    # Use GradientBoosting as default best model
-    model = GradientBoostingClassifier(
-        n_estimators=100, max_depth=3, random_state=RANDOM_STATE
-    )
+    template = MODELS[model_name]
+    model = template.__class__(**template.get_params())
     model.fit(X_train, y_train)
 
     predict_df = predict_df[["ticker", "sector"]].copy()
@@ -234,31 +261,33 @@ def run_supervised_pipeline(
     print("TRILHA A — Supervised Learning Pipeline")
     print("=" * 60)
 
-    # 1. Walk-forward validation
     print("\n--- Walk-Forward Validation ---")
-    metrics_df = walk_forward_validation(feature_matrix_path)
+    records_by_model = {
+        name: walk_forward_validation(model, feature_matrix_path)
+        for name, model in MODELS.items()
+    }
+    metrics_df = _records_to_df(records_by_model)
     print(metrics_df.to_string(index=False))
 
-    # 2. Aggregate metrics
     print("\n--- Aggregated Metrics (mean ± std) ---")
     agg = aggregate_metrics(metrics_df)
     print(agg.to_string(index=False))
 
-    # 3. Pick best model by mean roc_auc
     best_row = agg.sort_values("roc_auc_mean", ascending=False).iloc[0]
     best_model_name = best_row["model"]
     print(f"\nBest model: {best_model_name} (mean roc_auc={best_row['roc_auc_mean']})")
 
-    # 4. Feature importance
     print("\n--- Feature Importance ---")
     fi, _, _ = extract_feature_importance(
         feature_matrix_path, best_model_name=best_model_name
     )
     print(fi.head(10).to_string(index=False))
 
-    # 5. 2024 predictions
     print("\n--- 2024 Predictions ---")
-    preds = predict_2024(feature_matrix_path)
+    preds = predict_2024(
+        model_name=best_model_name,
+        feature_matrix_path=feature_matrix_path,
+    )
     print(preds.to_string(index=False))
 
     return {
