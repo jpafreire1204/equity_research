@@ -34,17 +34,37 @@ def main(argv: list[str] | None = None) -> None:
         help="Drivers que o usuário alega suportar a tese",
     )
     parser.add_argument(
-        "--rationale",
+        "--convictions",
+        nargs="+",
         required=True,
-        help="Texto livre com a justificativa da tese (PT-BR)",
+        help="Convicção 1-10 por driver, formato driver=N (ex: fundamentals_quality=9)",
     )
     args = parser.parse_args(argv)
 
+    convictions: dict[str, int] = {}
+    for pair in args.convictions:
+        if "=" not in pair:
+            parser.error(f"formato inválido para convicção: {pair} (esperado driver=N)")
+        k, v = pair.split("=", 1)
+        if k not in _ALLOWED_DRIVERS:
+            parser.error(f"driver inválido: {k}")
+        try:
+            iv = int(v)
+        except ValueError:
+            parser.error(f"convicção não é inteiro: {pair}")
+        if not 1 <= iv <= 10:
+            parser.error(f"convicção fora do range 1-10: {pair}")
+        convictions[k] = iv
+
+    for d in args.drivers:
+        if d not in convictions:
+            parser.error(f"falta convicção para driver: {d}")
+
     thesis = ThesisInput(
         ticker=args.ticker.upper(),
-        rationale=args.rationale,
         direction=args.direction,
         drivers=args.drivers,
+        convictions=convictions,
     )
     result = audit_thesis(thesis)
     print(json.dumps(asdict(result), indent=2, ensure_ascii=False))

@@ -5,7 +5,7 @@ import datetime as dt
 
 from src.auditor.contracts import AuditResult, DriverKey, ThesisInput
 from src.auditor.evidence import collect_evidence
-from src.auditor.scorer import compute_score, semantic_similarity
+from src.auditor.scorer import compute_score
 from src.auditor.tensions import detect_tensions
 
 _SUPPORT_TEMPLATES: dict[DriverKey, str] = {
@@ -62,8 +62,7 @@ def audit_thesis(thesis: ThesisInput) -> AuditResult:
     """Full pipeline: collect evidence → detect tensions → score → return result."""
     evidence = collect_evidence(thesis.ticker, thesis.drivers)
     tensions = detect_tensions(thesis, evidence)
-    similarity = semantic_similarity(thesis.rationale, thesis.ticker)
-    score, verdict = compute_score(thesis, tensions, similarity)
+    score, gap, verdict = compute_score(thesis, tensions)
 
     drivers_with_tension = {t.driver for t in tensions}
     supporting: list[str] = []
@@ -80,7 +79,7 @@ def audit_thesis(thesis: ThesisInput) -> AuditResult:
         ticker=thesis.ticker,
         consistency_score=score,
         verdict=verdict,
-        semantic_similarity=round(similarity, 4),
+        conviction_gap_score=round(gap, 1),
         tensions=tensions,
         supporting_evidence=supporting,
         auditado_em=dt.datetime.now().isoformat(timespec="seconds"),

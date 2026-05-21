@@ -4,6 +4,19 @@ from __future__ import annotations
 from src.auditor.contracts import DriverKey, Tension, ThesisInput
 
 
+def _amplify_severity(base_severity: str, conviction: int | None) -> str:
+    """Conviction 9-10 bumps severity up one level. Conviction 1-3 dampens it down."""
+    if conviction is None:
+        return base_severity
+    order = ["low", "medium", "high"]
+    idx = order.index(base_severity)
+    if conviction >= 9 and idx < 2:
+        idx += 1
+    elif conviction <= 3 and idx > 0:
+        idx -= 1
+    return order[idx]
+
+
 def _pct(v) -> str:
     return f"{v * 100:+.1f}%" if isinstance(v, (int, float)) else "n/d"
 
@@ -237,7 +250,11 @@ _RULES = {
 
 
 def detect_tensions(thesis: ThesisInput, evidence: dict) -> list[Tension]:
-    """Compare user claims against evidence; return tensions where data contradicts thesis."""
+    """Compare user claims against evidence; return tensions where data contradicts thesis.
+
+    Each tension's severity is amplified or dampened by the declared conviction
+    for that driver: 9-10 bumps up one level, 1-3 dampens down one level.
+    """
     out: list[Tension] = []
     for driver in thesis.drivers:
         ev = evidence.get(driver, {})
@@ -248,6 +265,13 @@ def detect_tensions(thesis: ThesisInput, evidence: dict) -> list[Tension]:
         if rule is None:
             continue
         t = rule(thesis.direction, ev)
-        if t is not None:
-            out.append(t)
+        if t is None:
+            continue
+        conv = thesis.convictions.get(driver)
+        t.severity = _amplify_severity(t.severity, conv)
+        if conv is not None and conv >= 8:
+            t.finding += f" Convicção declarada {conv}/10 amplifica o gap."
+        elif conv is not None and conv <= 3:
+            t.finding += f" Convicção declarada {conv}/10 ja era moderada."
+        out.append(t)
     return out

@@ -14,9 +14,9 @@ DriverKey = Literal[
 @dataclass
 class ThesisInput:
     ticker: str
-    rationale: str
     direction: Literal["bullish", "bearish"]
     drivers: list[DriverKey]
+    convictions: dict[DriverKey, int]
 
 
 @dataclass
@@ -32,7 +32,7 @@ class AuditResult:
     ticker: str
     consistency_score: float
     verdict: Literal["sustentavel", "sustentavel_com_ressalvas", "fragilizada"]
-    semantic_similarity: float
+    conviction_gap_score: float
     tensions: list[Tension] = field(default_factory=list)
     supporting_evidence: list[str] = field(default_factory=list)
     auditado_em: str = ""
